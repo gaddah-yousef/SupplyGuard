@@ -58,3 +58,45 @@ jobs:
           path: supplyguard-sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
+
+  publish-image:
+    name: Publier l'image sur GHCR
+    needs: [tests, container-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Construire l'image
+        run: |
+          docker build \
+            --tag ghcr.io/gaddah-yousef/supplyguard:${{ github.sha }} \
+            --tag ghcr.io/gaddah-yousef/supplyguard:latest .
+
+      - name: Scanner l'image avec Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/gaddah-yousef/supplyguard:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          version: v0.76.1
+
+      - name: Se connecter à GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publier l'image
+        run: |
+          docker push ghcr.io/gaddah-yousef/supplyguard:${{ github.sha }}
+          docker push ghcr.io/gaddah-yousef/supplyguard:latest
