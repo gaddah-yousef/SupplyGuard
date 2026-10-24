@@ -24,3 +24,25 @@ jobs:
 
       - name: Lancer les tests
         run: python -m pytest -q
+
+  container-scan:
+    name: Scanner l'image Docker
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Construire l'image Docker
+        run: docker build --tag supplyguard-api:${{ github.sha }} .
+
+      - name: Scanner l'image avec Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: supplyguard-api:${{ github.sha }}
+          format: table
+          exit-code: "0"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
